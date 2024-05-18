@@ -83,6 +83,7 @@ interface IOptions extends FormlyJsonschemaOptions {
   readOnly?: boolean;
   key?: FormlyFieldConfig['key'];
   isOptional?: boolean;
+  ifs?: Array<{ if: JSONSchema7Definition; then: JSONSchema7Definition; else: JSONSchema7Definition }>;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -95,8 +96,10 @@ export class FormlyJsonschema {
   private _toFieldConfig(schema: FormlyJSONSchema7, { key, ...options }: IOptions): FormlyFieldConfig {
     schema = this.resolveSchema(schema, options);
     const types = this.guessSchemaType(schema);
+    const ifs = options.ifs;
+    delete options.ifs;
 
-    let field: FormlyFieldConfig & { shareFormControl?: boolean } = {
+    let field: FormlyFieldConfig & { shareFormControl?: boolean; if?: boolean } = {
       type: types[0],
       defaultValue: schema.default,
       props: {
@@ -259,6 +262,46 @@ export class FormlyJsonschema {
           field.fieldGroup = [];
         }
 
+        const fieldOptions: Record<string, FormlyFieldConfig> = {};
+
+        if (ifs) {
+          ifs.forEach((condition) => {
+            if (condition.then === true || condition.then === false || condition.then === undefined) {
+              condition.then = {};
+            }
+            if (condition.else === true || condition.else === false || condition.else === undefined) {
+              condition.else = {};
+            }
+
+            [condition.then, condition.else].forEach((s, i) => {
+              if (s.properties) {
+                Object.keys(s.properties).forEach((p) => {
+                  if (p in Object.keys(schema.properties)) {
+                    throw Error(`support for conditionally updating existing properties is not implemented (${p})`);
+                  }
+                  schema.properties[p] = s.properties[p];
+                  fieldOptions[p] = {
+                    expressions: {
+                      hide: (f) => {
+                        if (condition.if === true) return i === 1; // hide else
+                        if (condition.if === false) return i === 0; // hide then
+                        const base = clone(schema);
+                        const valid = this.isFieldValid(
+                          f.parent.parent,
+                          0,
+                          [reverseDeepMerge(base, condition.if)],
+                          options,
+                        );
+                        return (valid ? 1 : 0) === i;
+                      },
+                    },
+                  };
+                });
+              }
+            });
+          });
+        }
+
         const { propDeps, schemaDeps } = this.resolveDependencies(schema);
         Object.keys(schema.properties || {}).forEach((property) => {
           const isRequired = Array.isArray(schema.required) && schema.required.indexOf(property) !== -1;
@@ -267,6 +310,13 @@ export class FormlyJsonschema {
             key: property,
             isOptional: options.isOptional || !isRequired,
           });
+
+          if (fieldOptions[property] && fieldOptions[property].expressions) {
+            f.expressions = {
+              ...(f.expressions || {}),
+              ...(fieldOptions[property].expressions || {}),
+            };
+          }
 
           field.fieldGroup.push(f);
           if (isRequired || propDeps[property]) {
@@ -472,13 +522,6 @@ export class FormlyJsonschema {
       ];
     }
 
-    if (schema.oneOf && !field.type) {
-      delete field.key;
-      field.fieldGroup = [
-        this.resolveMultiSchema('oneOf', <JSONSchema7[]>schema.oneOf, { ...options, key, shareFormControl: false }),
-      ];
-    }
-
     // map in possible formlyConfig options from the widget property
     if (schema.widget?.formlyConfig) {
       field = this.mergeFields(field, schema.widget.formlyConfig);
@@ -499,7 +542,23 @@ export class FormlyJsonschema {
       schema = this.resolveAllOf(schema, options);
     }
 
+    if (schema && schema.if !== undefined) {
+      // if/then/else outside of allOf
+      this.saveIfs(schema, options);
+    }
+
     return schema;
+  }
+
+  private saveIfs(schema: FormlyJSONSchema7, options: IOptions) {
+    if (!options.ifs) {
+      options.ifs = [];
+    }
+
+    options.ifs.push({ if: schema.if, then: schema.then, else: schema.else });
+    delete schema.if;
+    delete schema.then;
+    delete schema.else;
   }
 
   private resolveAllOf({ allOf, ...baseSchema }: FormlyJSONSchema7, options: IOptions) {
@@ -515,6 +574,10 @@ export class FormlyJsonschema {
 
       if (schema.uniqueItems) {
         base.uniqueItems = schema.uniqueItems;
+      }
+
+      if (schema.if !== undefined) {
+        this.saveIfs(schema, options);
       }
 
       // resolve to min value
