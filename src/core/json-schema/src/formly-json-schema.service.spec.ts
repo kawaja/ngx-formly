@@ -1863,54 +1863,6 @@ describe('Service: FormlyJsonschema', () => {
         expect(elseField.type).toBe('string');
       });
 
-      it('should create separate fields for multiple if conditions in allOf', () => {
-        const { field } = renderComponent({
-          schema: {
-            type: 'object',
-            properties: {
-              test: {
-                type: 'string',
-                enum: ['a', 'b'],
-              },
-            },
-            allOf: [
-              {
-                if: { properties: { test: { const: 'a' } } },
-                then: {
-                  properties: {
-                    conditionalA: {
-                      type: 'string',
-                      description: 'then clause for condition a',
-                      maxLength: 30,
-                    },
-                  },
-                },
-              },
-              {
-                if: { properties: { test: { const: 'b' } } },
-                then: {
-                  properties: {
-                    conditionalB: {
-                      type: 'string',
-                      description: 'then clause for condition b',
-                      minLength: 20,
-                    },
-                  },
-                },
-              },
-            ],
-          },
-        });
-
-        const [testField, thenFieldA, thenFieldB] = field.fieldGroup;
-
-        expect(testField.type).toBe('enum');
-        expect(thenFieldA.key).toBe('conditionalA');
-        expect(thenFieldA.props.description).toBe('then clause for condition a');
-        expect(thenFieldB.key).toBe('conditionalB');
-        expect(thenFieldB.props.description).toBe('then clause for condition b');
-      });
-
       // not even sure where to start with this one
       it.skip('should adjust properties based on condition', () => {
         const { field, fixture } = renderComponent({
@@ -2206,255 +2158,802 @@ describe('Service: FormlyJsonschema', () => {
         expect(elseField.hide).toBeTruthy();
       });
 
-      it('should hide non-matching "then" when using multiple "if" conditions in allOf', () => {
-        const { field } = renderComponent({
-          model: {
-            test: 'a',
-          },
-          schema: {
-            type: 'object',
-            properties: {
-              test: {
-                type: 'string',
-                enum: ['a', 'b'],
+      describe('conditional in object', () => {
+        const arrschema: JSONSchema7 = {
+          type: 'object',
+          properties: {
+            obj: {
+              type: 'object',
+              required: ['test'],
+              properties: {
+                test: {
+                  type: 'number',
+                },
+              },
+              if: { properties: { test: { minimum: 10 } } },
+              then: {
+                properties: {
+                  conditionalA: {
+                    type: 'string',
+                    description: 'then clause',
+                  },
+                },
+              },
+              else: {
+                properties: {
+                  conditionalB: {
+                    type: 'string',
+                    description: 'else clause',
+                  },
+                },
               },
             },
-            allOf: [
-              {
-                if: { properties: { test: { const: 'a' } } },
-                then: {
-                  properties: {
-                    conditionalA: {
-                      type: 'string',
-                      description: 'then clause for condition a',
-                      maxLength: 30,
-                    },
-                  },
-                },
-              },
-              {
-                if: { properties: { test: { const: 'b' } } },
-                then: {
-                  properties: {
-                    conditionalB: {
-                      type: 'string',
-                      description: 'then clause for condition b',
-                      minLength: 20,
-                    },
-                  },
-                },
-              },
-            ],
           },
+        };
+
+        it('should merge "then" and "else" with base schema in an object', () => {
+          const { field } = renderComponent({
+            model: { obj: { test: 4 } },
+            schema: arrschema,
+          });
+
+          const [testField, thenFieldA, thenFieldB] = field.fieldGroup[0].fieldGroup;
+
+          expect(testField.type).toBe('number');
+          expect(thenFieldA.key).toBe('conditionalA');
+          expect(thenFieldA.props.description).toBe('then clause');
+          expect(thenFieldB.key).toBe('conditionalB');
+          expect(thenFieldB.props.description).toBe('else clause');
         });
 
-        const [, thenFieldA, thenFieldB] = field.fieldGroup;
+        it('should hide "then" when "if" test is false', () => {
+          const { field } = renderComponent({
+            model: { obj: { test: 4 } },
+            schema: arrschema,
+          });
 
-        expect(thenFieldA.key).toBe('conditionalA');
-        expect(thenFieldB.key).toBe('conditionalB');
-
-        expect(thenFieldA.hide).toBeFalsy();
-        expect(thenFieldB.hide).toBeTruthy();
-      });
-
-      it('should hide all "then" when none match using multiple "if" conditions in allOf', () => {
-        const { field } = renderComponent({
-          model: {
-            test: 'c',
-          },
-          schema: {
-            type: 'object',
-            properties: {
-              test: {
-                type: 'string',
-                enum: ['a', 'b'],
-              },
-            },
-            allOf: [
-              {
-                if: { properties: { test: { const: 'a' } } },
-                then: {
-                  properties: {
-                    conditionalA: {
-                      type: 'string',
-                      description: 'then clause for condition a',
-                      maxLength: 30,
-                    },
-                  },
-                },
-              },
-              {
-                if: { properties: { test: { const: 'b' } } },
-                then: {
-                  properties: {
-                    conditionalB: {
-                      type: 'string',
-                      description: 'then clause for condition b',
-                      minLength: 20,
-                    },
-                  },
-                },
-              },
-            ],
-          },
+          const [
+            ,
+            // if target
+            thenField,
+            elseField,
+          ] = field.fieldGroup[0].fieldGroup;
+          expect(thenField.hide).toBeTruthy();
+          expect(elseField.hide).toBeFalsy();
         });
 
-        const [, thenFieldA, thenFieldB] = field.fieldGroup;
+        it('should hide "else" when "if" test is true', () => {
+          const { field } = renderComponent({
+            model: { obj: { test: 12 } },
+            schema: arrschema,
+          });
 
-        expect(thenFieldA.key).toBe('conditionalA');
-        expect(thenFieldB.key).toBe('conditionalB');
-
-        expect(thenFieldA.hide).toBeTruthy();
-        expect(thenFieldB.hide).toBeTruthy();
+          const [
+            ,
+            // if target
+            thenField,
+            elseField,
+          ] = field.fieldGroup[0].fieldGroup;
+          expect(thenField.hide).toBeFalsy();
+          expect(elseField.hide).toBeTruthy();
+        });
       });
 
-      it('should hide all "then" when none match using multiple numeric "if" conditions in allOf', () => {
-        const { field } = renderComponent({
-          model: {
-            test: 5,
-          },
-          schema: {
-            type: 'object',
-            properties: {
-              test: {
-                type: 'number',
-              },
-            },
-            allOf: [
-              {
+      describe('conditional in array', () => {
+        const arrschema: JSONSchema7 = {
+          type: 'object',
+          properties: {
+            arr: {
+              type: 'array',
+              items: {
+                required: ['test'],
+                type: 'object',
+                properties: {
+                  test: {
+                    type: 'number',
+                  },
+                },
                 if: { properties: { test: { minimum: 10 } } },
                 then: {
                   properties: {
                     conditionalA: {
                       type: 'string',
-                      description: 'then clause for condition a',
-                      maxLength: 30,
+                      description: 'then clause',
                     },
                   },
                 },
-              },
-              {
-                if: { properties: { test: { maximum: 0 } } },
-                then: {
+                else: {
                   properties: {
                     conditionalB: {
                       type: 'string',
-                      description: 'then clause for condition b',
-                      minLength: 20,
+                      description: 'else clause',
                     },
                   },
                 },
-              },
-            ],
-          },
-        });
-
-        const [, thenFieldA, thenFieldB] = field.fieldGroup;
-
-        expect(thenFieldA.key).toBe('conditionalA');
-        expect(thenFieldB.key).toBe('conditionalB');
-
-        expect(thenFieldA.hide).toBeTruthy();
-        expect(thenFieldB.hide).toBeTruthy();
-      });
-
-      it('should show multiple "then" when multiple match using multiple "if" conditions in allOf', () => {
-        const { field } = renderComponent({
-          model: {
-            test: 5,
-          },
-          schema: {
-            type: 'object',
-            properties: {
-              test: {
-                type: 'number',
               },
             },
-            allOf: [
-              {
-                if: { properties: { test: { minimum: 0 } } },
-                then: {
-                  properties: {
-                    conditionalA: {
-                      type: 'string',
-                      description: 'then clause for condition a',
-                      maxLength: 30,
-                    },
-                  },
-                },
-              },
-              {
-                if: { properties: { test: { maximum: 10 } } },
-                then: {
-                  properties: {
-                    conditionalB: {
-                      type: 'string',
-                      description: 'then clause for condition b',
-                      minLength: 20,
-                    },
-                  },
-                },
-              },
-            ],
           },
+        };
+
+        it('should merge "then" and "else" with base schema in an array', () => {
+          const { field } = renderComponent({
+            model: { arr: [{ test: 4 }] },
+            schema: arrschema,
+          });
+
+          const [testField, thenField, elseField] = field.fieldGroup[0].fieldGroup[0].fieldGroup;
+
+          expect(testField.type).toBe('number');
+          expect(thenField.key).toBe('conditionalA');
+          expect(thenField.props.description).toBe('then clause');
+          expect(elseField.key).toBe('conditionalB');
+          expect(elseField.props.description).toBe('else clause');
         });
 
-        const [, thenFieldA, thenFieldB] = field.fieldGroup;
+        it('should merge "then" and "else" with base schema in an array after add item', () => {
+          const { field, query, detectChanges } = renderComponent({
+            model: { arr: [{ test: 4 }] },
+            schema: arrschema,
+          });
 
-        expect(thenFieldA.key).toBe('conditionalA');
-        expect(thenFieldB.key).toBe('conditionalB');
+          query('#add').triggerEventHandler('click', {});
+          detectChanges();
 
-        expect(thenFieldA.hide).toBeFalsy();
-        expect(thenFieldB.hide).toBeFalsy();
+          const [testField, thenField, elseField] = field.fieldGroup[0].fieldGroup[1].fieldGroup;
+
+          expect(testField.type).toBe('number');
+          expect(thenField.key).toBe('conditionalA');
+          expect(thenField.props.description).toBe('then clause');
+          expect(elseField.key).toBe('conditionalB');
+          expect(elseField.props.description).toBe('else clause');
+        });
+
+        it('should hide "then" when "if" test is false in an array', () => {
+          const { field, query, detectChanges } = renderComponent({
+            model: {},
+            schema: arrschema,
+          });
+
+          query('#add').triggerEventHandler('click', {});
+          detectChanges();
+          field.fieldGroup[0].fieldGroup[0].fieldGroup[0].formControl.setValue('4');
+          detectChanges();
+
+          const [, thenField, elseField] = field.fieldGroup[0].fieldGroup[0].fieldGroup;
+
+          expect(thenField.hide).toBeTruthy();
+          expect(elseField.hide).toBeFalsy();
+        });
+
+        it('should hide "else" when "if" test is true in an array', () => {
+          const { field, query, detectChanges } = renderComponent({
+            model: {},
+            schema: arrschema,
+          });
+
+          query('#add').triggerEventHandler('click', {});
+          detectChanges();
+          field.fieldGroup[0].fieldGroup[0].fieldGroup[0].formControl.setValue('12');
+          detectChanges();
+
+          const [, thenField, elseField] = field.fieldGroup[0].fieldGroup[0].fieldGroup;
+
+          expect(thenField.hide).toBeFalsy();
+          expect(elseField.hide).toBeTruthy();
+        });
+
+        it('should hide different clauses in each array value', () => {
+          const { field, query, detectChanges } = renderComponent({
+            model: {},
+            schema: arrschema,
+          });
+
+          query('#add').triggerEventHandler('click', {});
+          query('#add').triggerEventHandler('click', {});
+          detectChanges();
+          field.fieldGroup[0].fieldGroup[0].fieldGroup[0].formControl.setValue('4');
+          field.fieldGroup[0].fieldGroup[1].fieldGroup[0].formControl.setValue('12');
+          detectChanges();
+
+          let [, thenField, elseField] = field.fieldGroup[0].fieldGroup[0].fieldGroup;
+
+          expect(thenField.hide).toBeTruthy();
+          expect(elseField.hide).toBeFalsy();
+
+          [, thenField, elseField] = field.fieldGroup[0].fieldGroup[1].fieldGroup;
+
+          expect(thenField.hide).toBeFalsy();
+          expect(elseField.hide).toBeTruthy();
+        });
       });
 
-      it('should hide all "else" when required model undefined using multiple "if" conditions in allOf', () => {
-        const { field } = renderComponent({
-          model: {},
-          schema: {
-            type: 'object',
-            required: ['test'],
-            properties: {
-              test: {
-                type: 'number',
+      describe('conditional allOf', () => {
+        const aoschema: JSONSchema7 = {
+          type: 'object',
+          properties: {
+            test: {
+              type: 'number',
+            },
+          },
+          allOf: [
+            {
+              if: { properties: { test: { minimum: 10 } } },
+              then: {
+                properties: {
+                  conditionalA: {
+                    type: 'string',
+                    description: 'then clause for condition a',
+                    maxLength: 30,
+                  },
+                },
               },
             },
-            allOf: [
-              {
-                if: { properties: { test: { minimum: 0 } } },
-                then: {
-                  properties: {
-                    conditionalA: {
-                      type: 'string',
-                      description: 'then clause for condition a',
-                      maxLength: 30,
-                    },
+            {
+              if: { properties: { test: { minimum: 5 } } },
+              then: {
+                properties: {
+                  conditionalB: {
+                    type: 'string',
+                    description: 'then clause for condition b',
+                    minLength: 20,
                   },
                 },
               },
-              {
-                if: { properties: { test: { maximum: 10 } } },
-                then: {
-                  properties: {
-                    conditionalB: {
-                      type: 'string',
-                      description: 'then clause for condition b',
-                      minLength: 20,
-                    },
-                  },
-                },
-              },
-            ],
-          },
+            },
+          ],
+        };
+
+        it('should create separate fields for multiple if conditions in allOf', () => {
+          const { field } = renderComponent({
+            schema: aoschema,
+          });
+
+          const [testField, thenFieldA, thenFieldB] = field.fieldGroup;
+
+          expect(testField.type).toBe('number');
+          expect(thenFieldA.key).toBe('conditionalA');
+          expect(thenFieldA.props.description).toBe('then clause for condition a');
+          expect(thenFieldB.key).toBe('conditionalB');
+          expect(thenFieldB.props.description).toBe('then clause for condition b');
         });
 
-        const [, thenFieldA, thenFieldB] = field.fieldGroup;
+        it('should hide non-matching "then" when using multiple "if" conditions in allOf', () => {
+          const { field } = renderComponent({
+            model: { test: 7 },
+            schema: aoschema,
+          });
 
-        expect(thenFieldA.key).toBe('conditionalA');
-        expect(thenFieldB.key).toBe('conditionalB');
+          const [, thenFieldA, thenFieldB] = field.fieldGroup;
 
-        expect(thenFieldA.hide).toBeTruthy();
-        expect(thenFieldB.hide).toBeTruthy();
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeFalsy();
+        });
+
+        it('should hide all "then" when none match using multiple "if" conditions in allOf', () => {
+          const { field } = renderComponent({
+            model: { test: 4 },
+            schema: aoschema,
+          });
+
+          const [, thenFieldA, thenFieldB] = field.fieldGroup;
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeTruthy();
+        });
+
+        it('should hide all "then" when none match using multiple numeric "if" conditions in allOf', () => {
+          const { field } = renderComponent({
+            model: { test: 4 },
+            schema: aoschema,
+          });
+
+          const [, thenFieldA, thenFieldB] = field.fieldGroup;
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeTruthy();
+        });
+
+        it('should show multiple "then" when multiple match using multiple "if" conditions in allOf', () => {
+          const { field } = renderComponent({
+            model: { test: 12 },
+            schema: aoschema,
+          });
+
+          const [, thenFieldA, thenFieldB] = field.fieldGroup;
+
+          expect(thenFieldA.hide).toBeFalsy();
+          expect(thenFieldB.hide).toBeFalsy();
+        });
+
+        it('should hide all "else" when required model empty using multiple "if" conditions in allOf', () => {
+          const { field } = renderComponent({
+            model: {},
+            schema: { ...aoschema, required: ['test'] },
+          });
+
+          const [, thenFieldA, thenFieldB] = field.fieldGroup;
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeTruthy();
+        });
+
+        it('should hide all "else" when required model undefined using multiple "if" conditions in allOf', () => {
+          const { field } = renderComponent({
+            model: undefined,
+            schema: { ...aoschema, required: ['test'] },
+          });
+
+          const [, thenFieldA, thenFieldB] = field.fieldGroup;
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeTruthy();
+        });
+
+        it('should take account of model change after build when using multiple if conditions in allOf', () => {
+          const { field, fixture } = renderComponent({
+            model: { test: 7 },
+            schema: { ...aoschema, required: ['test'] },
+          });
+
+          const [, thenFieldA, thenFieldB] = field.fieldGroup;
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeFalsy();
+
+          (fixture.componentInstance as any)['model'] = { test: 12 };
+          fixture.detectChanges();
+
+          expect(thenFieldA.hide).toBeFalsy();
+          expect(thenFieldB.hide).toBeFalsy();
+
+          (fixture.componentInstance as any)['model'] = { test: 4 };
+          fixture.detectChanges();
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeTruthy();
+
+          (fixture.componentInstance as any)['model'] = {};
+          fixture.detectChanges();
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeTruthy();
+        });
+      });
+
+      describe('conditional allOf with definitions', () => {
+        const defschema: JSONSchema7 = {
+          type: 'object',
+          $defs: {
+            ao: {
+              required: ['test'],
+              type: 'object',
+              properties: {
+                test: {
+                  type: 'number',
+                },
+              },
+              allOf: [
+                {
+                  if: { properties: { test: { minimum: 10 } } },
+                  then: {
+                    properties: {
+                      conditionalA: {
+                        type: 'string',
+                        description: 'then clause for condition a',
+                        maxLength: 30,
+                      },
+                    },
+                  },
+                },
+                {
+                  if: { properties: { test: { minimum: 5 } } },
+                  then: {
+                    properties: {
+                      conditionalB: {
+                        type: 'string',
+                        description: 'then clause for condition b',
+                        minLength: 20,
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+          properties: {
+            obj1: {
+              $ref: '#/$defs/ao',
+            },
+            obj2: {
+              $ref: '#/$defs/ao',
+            },
+          },
+        };
+
+        it('should create separate fields for multiple if conditions in multiple refs to allOf def', () => {
+          const { field } = renderComponent({
+            model: {},
+            schema: defschema,
+          });
+
+          const [testField1, thenFieldA1, thenFieldB1] = field.fieldGroup[0].fieldGroup;
+          const [testField2, thenFieldA2, thenFieldB2] = field.fieldGroup[1].fieldGroup;
+
+          expect(testField1.type).toBe('number');
+          expect(thenFieldA1.key).toBe('conditionalA');
+          expect(thenFieldA1.props.description).toBe('then clause for condition a');
+          expect(thenFieldB1.key).toBe('conditionalB');
+          expect(thenFieldB1.props.description).toBe('then clause for condition b');
+
+          expect(testField2.type).toBe('number');
+          expect(thenFieldA2.key).toBe('conditionalA');
+          expect(thenFieldA2.props.description).toBe('then clause for condition a');
+          expect(thenFieldB2.key).toBe('conditionalB');
+          expect(thenFieldB2.props.description).toBe('then clause for condition b');
+        });
+
+        it('should hide non-matching "then" when using multiple "if" conditions in allOf', () => {
+          const { field, detectChanges } = renderComponent({
+            model: {},
+            schema: defschema,
+          });
+
+          let [, thenFieldA, thenFieldB] = field.fieldGroup[0].fieldGroup;
+
+          field.fieldGroup[0].fieldGroup[0].formControl.setValue('7');
+          detectChanges();
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeFalsy();
+
+          field.fieldGroup[1].fieldGroup[0].formControl.setValue('7');
+          detectChanges();
+
+          [, thenFieldA, thenFieldB] = field.fieldGroup[1].fieldGroup;
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeFalsy();
+        });
+
+        // it('should hide all "then" when none match using multiple "if" conditions in allOf', () => {
+        //   const { field, query, detectChanges } = renderComponent({
+        //     model: { },
+        //     schema: aoarrdefschema,
+        //   });
+
+        //   query('#add').triggerEventHandler('click', {});
+        //   detectChanges();
+        //   field.fieldGroup[0].fieldGroup[0].fieldGroup[0].formControl.setValue('4');
+        //   detectChanges();
+
+        //   const [, thenFieldA, thenFieldB] = field.fieldGroup[1].fieldGroup[0].fieldGroup;
+
+        //   expect(thenFieldA.hide).toBeTruthy();
+        //   expect(thenFieldB.hide).toBeTruthy();
+        // });
+
+        // it('should hide all "then" when none match using multiple numeric "if" conditions in allOf', () => {
+        //   const { field, query, detectChanges } = renderComponent({
+        //     model: { },
+        //     schema: aoarrdefschema
+        //   });
+
+        //   query('#add').triggerEventHandler('click', {});
+        //   detectChanges();
+        //   field.fieldGroup[0].fieldGroup[0].fieldGroup[0].formControl.setValue('4');
+        //   detectChanges();
+
+        //   const [, thenFieldA, thenFieldB] = field.fieldGroup[1].fieldGroup[0].fieldGroup;
+
+        //   expect(thenFieldA.hide).toBeTruthy();
+        //   expect(thenFieldB.hide).toBeTruthy();
+        // });
+
+        // it('should show multiple "then" when multiple match using multiple "if" conditions in allOf', () => {
+        //   const { field, query, detectChanges } = renderComponent({
+        //     model: { },
+        //     schema: aoarrdefschema,
+        //   });
+
+        //   query('#add').triggerEventHandler('click', {});
+        //   detectChanges();
+        //   field.fieldGroup[0].fieldGroup[0].fieldGroup[0].formControl.setValue('12');
+        //   detectChanges();
+
+        //   const [, thenFieldA, thenFieldB] = field.fieldGroup[1].fieldGroup[0].fieldGroup;
+
+        //   expect(thenFieldA.hide).toBeFalsy();
+        //   expect(thenFieldB.hide).toBeFalsy();
+        // });
+
+        // it('should hide all "else" when required model undefined using multiple "if" conditions in allOf', () => {
+        //   const { field, query, detectChanges } = renderComponent({
+        //     model: {},
+        //     schema: {...aoarrdefschema}
+        //   });
+
+        //   query('#add').triggerEventHandler('click', {});
+        //   detectChanges();
+
+        //   const [, thenFieldA, thenFieldB] = field.fieldGroup[1].fieldGroup[0].fieldGroup;
+
+        //   expect(thenFieldA.hide).toBeTruthy();
+        //   expect(thenFieldB.hide).toBeTruthy();
+        // });
+
+        // it('should take account of model change after build when using multiple if conditions in allOf', () => {
+        //   const { field, query, detectChanges } = renderComponent({
+        //     model: { },
+        //     schema: {...aoarrdefschema, required: ['test']},
+        //   });
+
+        //   query('#add').triggerEventHandler('click', {});
+        //   detectChanges();
+        //   field.fieldGroup[0].fieldGroup[0].fieldGroup[0].formControl.setValue('7');
+        //   detectChanges();
+
+        //   const [, thenFieldA, thenFieldB] = field.fieldGroup[1].fieldGroup[0].fieldGroup;
+
+        //   expect(thenFieldA.hide).toBeTruthy();
+        //   expect(thenFieldB.hide).toBeFalsy();
+
+        //   field.fieldGroup[0].fieldGroup[0].fieldGroup[0].formControl.setValue('12');
+        //   detectChanges();
+
+        //   expect(thenFieldA.hide).toBeFalsy();
+        //   expect(thenFieldB.hide).toBeFalsy();
+
+        //   field.fieldGroup[0].fieldGroup[0].fieldGroup[0].formControl.setValue('4');
+        //   detectChanges();
+
+        //   expect(thenFieldA.hide).toBeTruthy();
+        //   expect(thenFieldB.hide).toBeTruthy();
+
+        //   field.fieldGroup[0].fieldGroup[0].fieldGroup[0].formControl.setValue('');
+        //   detectChanges();
+
+        //   expect(thenFieldA.hide).toBeTruthy();
+        //   expect(thenFieldB.hide).toBeTruthy();
+        // });
+      });
+
+      describe('conditional allOf in array', () => {
+        const aoarrschema: JSONSchema7 = {
+          type: 'object',
+          properties: {
+            arr: {
+              type: 'array',
+              items: {
+                required: ['test'],
+                type: 'object',
+                properties: {
+                  test: {
+                    type: 'number',
+                  },
+                },
+                allOf: [
+                  {
+                    if: { properties: { test: { minimum: 10 } } },
+                    then: {
+                      properties: {
+                        conditionalA: {
+                          type: 'string',
+                          description: 'then clause for condition a',
+                          maxLength: 30,
+                        },
+                      },
+                    },
+                  },
+                  {
+                    if: { properties: { test: { minimum: 5 } } },
+                    then: {
+                      properties: {
+                        conditionalB: {
+                          type: 'string',
+                          description: 'then clause for condition b',
+                          minLength: 20,
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        };
+
+        const aoarrdefschema: JSONSchema7 = {
+          type: 'object',
+          $defs: {
+            ao: {
+              required: ['test'],
+              type: 'object',
+              properties: {
+                test: {
+                  type: 'number',
+                },
+              },
+              allOf: [
+                {
+                  if: { properties: { test: { minimum: 10 } } },
+                  then: {
+                    properties: {
+                      conditionalA: {
+                        type: 'string',
+                        description: 'then clause for condition a',
+                        maxLength: 30,
+                      },
+                    },
+                  },
+                },
+                {
+                  if: { properties: { test: { minimum: 5 } } },
+                  then: {
+                    properties: {
+                      conditionalB: {
+                        type: 'string',
+                        description: 'then clause for condition b',
+                        minLength: 20,
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+          properties: {
+            obj: {
+              $ref: '#/$defs/ao',
+            },
+            arr: {
+              type: 'array',
+              items: {
+                $ref: '#/$defs/ao',
+              },
+            },
+          },
+        };
+
+        it('should create separate fields for multiple if conditions in allOf', () => {
+          const { field } = renderComponent({
+            model: { arr: [{ test: 4 }] },
+            schema: aoarrdefschema,
+          });
+
+          const [testField, thenFieldA, thenFieldB] = field.fieldGroup[1].fieldGroup[0].fieldGroup;
+
+          expect(testField.type).toBe('number');
+          expect(thenFieldA.key).toBe('conditionalA');
+          expect(thenFieldA.props.description).toBe('then clause for condition a');
+          expect(thenFieldB.key).toBe('conditionalB');
+          expect(thenFieldB.props.description).toBe('then clause for condition b');
+        });
+
+        it('should hide non-matching "then" when using multiple "if" conditions in allOf', () => {
+          const { field, query, detectChanges } = renderComponent({
+            model: {},
+            schema: aoarrdefschema,
+          });
+
+          let [, thenFieldA, thenFieldB] = field.fieldGroup[0].fieldGroup;
+
+          field.fieldGroup[0].fieldGroup[0].formControl.setValue('7');
+          detectChanges();
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeFalsy();
+
+          query('#add').triggerEventHandler('click', {});
+          detectChanges();
+          field.fieldGroup[1].fieldGroup[0].fieldGroup[0].formControl.setValue('7');
+          detectChanges();
+
+          [, thenFieldA, thenFieldB] = field.fieldGroup[1].fieldGroup[0].fieldGroup;
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeFalsy();
+        });
+
+        it('should hide all "then" when none match using multiple "if" conditions in allOf', () => {
+          const { field, query, detectChanges } = renderComponent({
+            model: {},
+            schema: aoarrdefschema,
+          });
+
+          query('#add').triggerEventHandler('click', {});
+          detectChanges();
+          field.fieldGroup[1].fieldGroup[0].fieldGroup[0].formControl.setValue('4');
+          detectChanges();
+
+          const [, thenFieldA, thenFieldB] = field.fieldGroup[1].fieldGroup[0].fieldGroup;
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeTruthy();
+        });
+
+        it('should hide all "then" when none match using multiple numeric "if" conditions in allOf', () => {
+          const { field, query, detectChanges } = renderComponent({
+            model: {},
+            schema: aoarrdefschema,
+          });
+
+          query('#add').triggerEventHandler('click', {});
+          detectChanges();
+          field.fieldGroup[1].fieldGroup[0].fieldGroup[0].formControl.setValue('4');
+          detectChanges();
+
+          const [, thenFieldA, thenFieldB] = field.fieldGroup[1].fieldGroup[0].fieldGroup;
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeTruthy();
+        });
+
+        it('should show multiple "then" when multiple match using multiple "if" conditions in allOf', () => {
+          const { field, query, detectChanges } = renderComponent({
+            model: {},
+            schema: aoarrdefschema,
+          });
+
+          query('#add').triggerEventHandler('click', {});
+          detectChanges();
+          field.fieldGroup[1].fieldGroup[0].fieldGroup[0].formControl.setValue('12');
+          detectChanges();
+
+          const [, thenFieldA, thenFieldB] = field.fieldGroup[1].fieldGroup[0].fieldGroup;
+
+          expect(thenFieldA.hide).toBeFalsy();
+          expect(thenFieldB.hide).toBeFalsy();
+        });
+
+        it('should hide all "else" when required model undefined using multiple "if" conditions in allOf', () => {
+          const { field, query, detectChanges } = renderComponent({
+            model: {},
+            schema: { ...aoarrdefschema },
+          });
+
+          query('#add').triggerEventHandler('click', {});
+          detectChanges();
+
+          const [, thenFieldA, thenFieldB] = field.fieldGroup[1].fieldGroup[0].fieldGroup;
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeTruthy();
+        });
+
+        it('should take account of model change after build when using multiple if conditions in allOf', () => {
+          const { field, query, detectChanges } = renderComponent({
+            model: {},
+            schema: { ...aoarrdefschema, required: ['test'] },
+          });
+
+          query('#add').triggerEventHandler('click', {});
+          detectChanges();
+          field.fieldGroup[1].fieldGroup[0].fieldGroup[0].formControl.setValue('7');
+          detectChanges();
+
+          const [, thenFieldA, thenFieldB] = field.fieldGroup[1].fieldGroup[0].fieldGroup;
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeFalsy();
+
+          field.fieldGroup[1].fieldGroup[0].fieldGroup[0].formControl.setValue('12');
+          detectChanges();
+
+          expect(thenFieldA.hide).toBeFalsy();
+          expect(thenFieldB.hide).toBeFalsy();
+
+          field.fieldGroup[1].fieldGroup[0].fieldGroup[0].formControl.setValue('4');
+          detectChanges();
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeTruthy();
+
+          field.fieldGroup[1].fieldGroup[0].fieldGroup[0].formControl.setValue('');
+          detectChanges();
+
+          expect(thenFieldA.hide).toBeTruthy();
+          expect(thenFieldB.hide).toBeTruthy();
+        });
       });
 
       it('should handle empty "then"', () => {
@@ -2672,10 +3171,77 @@ describe('Service: FormlyJsonschema', () => {
         expect(elseField.hide).toBeFalsy();
       });
 
-      it('should take account of model change after build when using multiple if conditions in allOf', () => {
-        const { field, fixture } = renderComponent({
+      it('should not replace/reset fields on min/max failure', () => {
+        const schema: JSONSchema7 = JSON.parse(`
+          {
+            "type": "object",
+            "properties": {
+              "test": {
+                "type": "string",
+                "enum": ["a", "b"],
+                "default": "hello"
+              },
+              "field1": {
+                "type": "number",
+                "minimum": 5,
+                "maximum": 10,
+                "description": "first field - number",
+                "widget": {
+                  "formlyConfig": {
+                    "expressions": {
+                      "props.hide": "false"
+                    }
+                  }
+                }
+              },
+              "field2": {
+                "type": "string",
+                "description": "second field - string"
+              }
+            }
+          }
+        `);
+
+        const { field, detectChanges } = renderComponent({
           model: {
             test: 'a',
+          },
+          schema,
+        });
+
+        console.log(JSON.stringify(field, null, 2));
+
+        let [
+          ,
+          // if target
+          thenField1,
+          thenField2,
+        ] = field.fieldGroup;
+        expect(thenField1.hide).toBeFalsy();
+        expect(thenField2.hide).toBeFalsy();
+
+        field.fieldGroup[2].formControl.setValue('test');
+        detectChanges();
+
+        expect(field.model.field2).toEqual('test');
+
+        field.fieldGroup[1].formControl.setValue('5');
+        detectChanges();
+
+        expect(field.model.field1).toEqual(5);
+        expect(field.model.field2).toEqual('test');
+
+        field.fieldGroup[1].formControl.setValue('2');
+        detectChanges();
+
+        expect(field.model.field1).toEqual(2);
+        expect(field.model.field2).toEqual('test');
+      });
+
+      it('should not replace/reset conditional fields on min/max failure', () => {
+        const { field, detectChanges } = renderComponent({
+          model: {
+            test: 'a', // true
           },
           schema: {
             type: 'object',
@@ -2685,62 +3251,51 @@ describe('Service: FormlyJsonschema', () => {
                 enum: ['a', 'b'],
               },
             },
-            allOf: [
-              {
-                if: { properties: { test: { const: 'a' } } },
-                then: {
-                  properties: {
-                    conditionalA: {
-                      type: 'string',
-                      description: 'then clause for condition a',
-                      maxLength: 30,
-                    },
-                  },
+            if: { properties: { test: { const: 'a' } } },
+            then: {
+              properties: {
+                conditionalThen1: {
+                  type: 'number',
+                  minimum: 5,
+                  maximum: 10,
+                  description: 'then clause #1 - number',
+                },
+                conditionalThen2: {
+                  type: 'string',
+                  description: 'then clause #2 - string',
                 },
               },
-              {
-                if: { properties: { test: { const: 'b' } } },
-                then: {
-                  properties: {
-                    conditionalB: {
-                      type: 'string',
-                      description: 'then clause for condition b',
-                      minLength: 20,
-                    },
-                  },
-                },
-              },
-            ],
+            },
           },
         });
 
-        const [, thenFieldA, thenFieldB] = field.fieldGroup;
+        console.log(JSON.stringify(field, null, 2));
 
-        expect(thenFieldA.key).toBe('conditionalA');
-        expect(thenFieldB.key).toBe('conditionalB');
+        let [
+          ,
+          // if target
+          thenField1,
+          thenField2,
+        ] = field.fieldGroup;
+        expect(thenField1.hide).toBeFalsy();
+        expect(thenField2.hide).toBeFalsy();
 
-        expect(thenFieldA.hide).toBeFalsy();
-        expect(thenFieldB.hide).toBeTruthy();
+        field.fieldGroup[2].formControl.setValue('test');
+        detectChanges();
 
-        (fixture.componentInstance as any)['model'] = { test: 'b' };
-        fixture.detectChanges();
+        expect(field.model.conditionalThen2).toEqual('test');
 
-        expect(thenFieldA.hide).toBeTruthy();
-        expect(thenFieldB.hide).toBeFalsy();
+        field.fieldGroup[1].formControl.setValue('5');
+        detectChanges();
 
-        (fixture.componentInstance as any)['model'] = { test: 'c' };
-        fixture.detectChanges();
+        expect(field.model.conditionalThen1).toEqual(5);
+        expect(field.model.conditionalThen2).toEqual('test');
 
-        expect(thenFieldA.hide).toBeTruthy();
-        expect(thenFieldB.hide).toBeTruthy();
+        field.fieldGroup[1].formControl.setValue('2');
+        detectChanges();
 
-        console.log('undefining "test"');
-
-        (fixture.componentInstance as any)['model'] = {};
-        fixture.detectChanges();
-
-        expect(thenFieldA.hide).toBeTruthy();
-        expect(thenFieldB.hide).toBeTruthy();
+        expect(field.model.conditionalThen1).toEqual(2);
+        expect(field.model.conditionalThen2).toEqual('test');
       });
     });
 

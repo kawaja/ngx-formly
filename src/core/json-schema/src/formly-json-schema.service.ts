@@ -305,25 +305,29 @@ export class FormlyJsonschema {
               condition.else = {};
             }
 
-            [condition.then, condition.else].forEach((s, i) => {
-              if (s.properties) {
-                Object.keys(s.properties).forEach((p) => {
+            [condition.then, condition.else].forEach((cond, i) => {
+              if (cond.properties) {
+                Object.keys(cond.properties).forEach((p) => {
                   if (p in Object.keys(schema.properties)) {
                     throw Error(`support for conditionally updating existing properties is not implemented (${p})`);
                   }
-                  schema.properties[p] = s.properties[p];
+                  schema.properties[p] = cond.properties[p];
                   fieldOptions[p] = {
                     expressions: {
                       hide: (f) => {
                         if (condition.if === true) return i === 1; // hide else
                         if (condition.if === false) return i === 0; // hide then
                         const base = clone(schema);
-                        const valid = this.isFieldValid(
-                          f.parent.parent,
-                          0,
-                          [reverseDeepMerge(base, condition.if)],
-                          options,
-                        );
+                        const merged = reverseDeepMerge(base, condition.if);
+                        const valid = this.isFieldValid(f.parent, 0, [merged], options, true);
+                        //   console.log(
+                        //     `index: ${i === 0 ? 'then' : 'else'}\n` +
+                        //     `merging: ${JSON.stringify(schema)}\n` +
+                        //     `with ${JSON.stringify(condition.if)}\n` +
+                        //     `producing ${JSON.stringify(merged)}\n` +
+                        //     `parent model ${JSON.stringify(f.parent.model)}\n` +
+                        //     `parent valid: ${valid}\n` +
+                        //     `hide: ${JSON.stringify((valid ? 1 : 0) === i)}`)
                         return (valid ? 1 : 0) === i;
                       },
                     },
@@ -578,7 +582,8 @@ export class FormlyJsonschema {
       this.saveIfs(schema, options);
     }
 
-    return schema;
+    // remove any if/then/else, as they've already been saved for later processing in options.ifs
+    return (({ if: _if, then: _then, else: _else, ...o }) => o)(schema);
   }
 
   private saveIfs(schema: FormlyJSONSchema7, options: IOptions) {
@@ -587,9 +592,6 @@ export class FormlyJsonschema {
     }
 
     options.ifs.push({ if: schema.if, then: schema.then, else: schema.else });
-    delete schema.if;
-    delete schema.then;
-    delete schema.else;
   }
 
   private resolveAllOf({ allOf, ...baseSchema }: FormlyJSONSchema7, options: IOptions) {
@@ -629,7 +631,8 @@ export class FormlyJsonschema {
         }
       });
 
-      return reverseDeepMerge(base, schema);
+      // remove any if/then/else, as they've already been saved for later processing in options.ifs
+      return reverseDeepMerge(base, (({ if: _if, then: _then, else: _else, ...o }) => o)(schema));
     }, baseSchema);
   }
 
@@ -819,6 +822,7 @@ export class FormlyJsonschema {
     i: number,
     schemas: JSONSchema7[],
     options: IOptions,
+    fieldonly: boolean = false, // prevent adding the parent's key into the model being validated
   ): boolean {
     const schema = schemas[i] as JSONSchema7 & { _field?: FormlyFieldConfig };
     if (!schema._field) {
@@ -827,7 +831,7 @@ export class FormlyJsonschema {
 
     let field = schema._field;
     let model = root.model ? root.model : root.fieldArray ? [] : {};
-    if (root.model && hasKey(root)) {
+    if (root.model && hasKey(root) && !fieldonly) {
       model = { [Array.isArray(root.key) ? root.key.join('.') : root.key]: getFieldValue(root) };
     }
 
