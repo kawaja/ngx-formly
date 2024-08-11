@@ -477,6 +477,7 @@ export class FormlyJsonschema {
         // TODO: remove isEnum check once adding an option to skip extension
         if (!this.isEnum(schema)) {
           field.fieldArray = (root: FormlyFieldConfig) => {
+            const length = root.fieldGroup ? root.fieldGroup.length : 0;
             const items = schema.items as JSONSchema7 | JSONSchema7[];
             if (!Array.isArray(items)) {
               if (!items) {
@@ -488,9 +489,7 @@ export class FormlyJsonschema {
               // When items is a single schema, the additionalItems keyword is meaningless, and it should not be used.
               const f = this._toFieldConfig(
                 items,
-                isMultiSchema
-                  ? { ...options, key: `${root.fieldGroup.length}`, isOptional: false }
-                  : { ...options, isOptional: false },
+                isMultiSchema ? { ...options, key: `${length}`, isOptional: false } : { ...options, isOptional: false },
               );
 
               if (isMultiSchema && !hasKey(f)) {
@@ -500,7 +499,6 @@ export class FormlyJsonschema {
               return f;
             }
 
-            const length = root.fieldGroup ? root.fieldGroup.length : 0;
             const itemSchema = items[length] ? items[length] : schema.additionalItems;
             const f = itemSchema ? this._toFieldConfig(<JSONSchema7>itemSchema, options) : {};
             if (f.props) {
