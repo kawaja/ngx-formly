@@ -5,6 +5,7 @@ import {
   getFieldValue,
   getKeyPath,
   clone,
+  clonePartial,
   observe,
   assignFieldValue,
   defineHiddenProp,
@@ -264,6 +265,24 @@ describe('clone', () => {
     value.name = 'foo';
 
     expect(value.a).toEqual('foo');
+  });
+});
+
+describe('clonePartial', () => {
+  it('should clone selected properties', () => {
+    const d = { a: 'test', b: 'no' };
+    const e = { a: 'test' };
+    const ref = { a: true };
+    expect(clonePartial(d, ref)).toEqual(e);
+    expect(clonePartial(d, ref)).not.toBe(d);
+  });
+
+  it('should clone nothing if no properties match', () => {
+    const d = { a: 'test', b: 'no' };
+    const e = {};
+    const ref = { c: true };
+    expect(clonePartial(d, ref)).toEqual(e);
+    expect(clonePartial(d, ref)).not.toBe(d);
   });
 });
 

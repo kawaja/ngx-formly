@@ -217,6 +217,16 @@ export function clone(value: any): any {
   }, c);
 }
 
+export function clonePartial<T extends object, U extends object>(source: T, reference: U): Partial<T> {
+  const result: Partial<T> = {};
+  for (const key in reference) {
+    if (key in source) {
+      result[key as unknown as keyof T] = clone(source[key as unknown as keyof T]);
+    }
+  }
+  return result;
+}
+
 export function defineHiddenProp(field: any, prop: string, defaultValue: any) {
   Object.defineProperty(field, prop, { enumerable: false, writable: true, configurable: true });
   field[prop] = defaultValue;

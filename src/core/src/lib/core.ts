@@ -22,5 +22,6 @@ export { defineHiddenProp as ɵdefineHiddenProp } from './utils';
 export { reverseDeepMerge as ɵreverseDeepMerge } from './utils';
 export { getFieldValue as ɵgetFieldValue } from './utils';
 export { clone as ɵclone } from './utils';
+export { clonePartial as ɵclonePartial } from './utils';
 export { observe as ɵobserve } from './utils';
 export { hasKey as ɵhasKey } from './utils';
