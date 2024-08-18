@@ -323,15 +323,15 @@ export class FormlyJsonschema {
                         base.properties = clonePartial(schema.properties, condition.if.properties);
                         const merged = reverseDeepMerge(base, condition.if);
                         const valid = this.isFieldValid(f.parent, 0, [merged], options, true);
-                        console.log(
-                          `index: ${i === 0 ? 'then' : 'else'}, property: ${f.key}\n` +
-                            `merging: ${JSON.stringify(base)}\n` +
-                            `with ${JSON.stringify(condition.if)}\n` +
-                            `producing ${JSON.stringify(merged)}\n` +
-                            `parent model ${JSON.stringify(f.parent.model)}\n` +
-                            `parent valid: ${valid}\n` +
-                            `hide: ${JSON.stringify((valid ? 1 : 0) === i)}`,
-                        );
+                        // console.log(
+                        //   `index: ${i === 0 ? 'then' : 'else'}, property: ${f.key}\n` +
+                        //     `merging: ${JSON.stringify(base)}\n` +
+                        //     `with ${JSON.stringify(condition.if)}\n` +
+                        //     `producing ${JSON.stringify(merged)}\n` +
+                        //     `parent model ${JSON.stringify(f.parent.model)}\n` +
+                        //     `parent valid: ${valid}\n` +
+                        //     `hide: ${JSON.stringify((valid ? 1 : 0) === i)}`,
+                        // );
                         return (valid ? 1 : 0) === i;
                       },
                     },

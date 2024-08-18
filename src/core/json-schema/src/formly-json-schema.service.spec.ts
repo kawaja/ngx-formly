@@ -3209,8 +3209,6 @@ describe('Service: FormlyJsonschema', () => {
           schema,
         });
 
-        console.log(JSON.stringify(field, null, 2));
-
         let [
           ,
           // if target
@@ -3268,8 +3266,6 @@ describe('Service: FormlyJsonschema', () => {
             },
           },
         });
-
-        console.log(JSON.stringify(field, null, 2));
 
         let [
           ,
